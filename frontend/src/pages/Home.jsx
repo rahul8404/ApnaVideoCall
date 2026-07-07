@@ -13,12 +13,32 @@ function HomeComponent() {
     const [meetingCode, setMeetingCode] = useState("");
 
 
-    const {addToUserHistory} = useContext(AuthContext);
-    let handleJoinVideoCall = async () => {
-        await addToUserHistory(meetingCode)
-        navigate(`/${meetingCode}`)
-    }
+    const { addToUserHistory } = useContext(AuthContext);
 
+
+    const handleJoinVideoCall = async () => {
+
+        if (!meetingCode.trim()) {
+            alert("Enter Meeting Code");
+            return;
+        }
+
+
+        try {
+
+            await addToUserHistory(meetingCode.trim());
+
+            navigate(`/${meetingCode.trim()}`);
+
+        } catch (error) {
+
+            console.log(error);
+
+            alert("Unable to join meeting");
+
+        }
+
+    }
     return (
         <>
 

@@ -3,19 +3,19 @@ import mongoose from "mongoose";
 
 configDotenv();
 
-const url = process.env.DB_URL
-
 const connectDb = async () => {
     try {
-        const db = await mongoose.connect(url);
-        console.log(`MONGO CONNECTED DB HOST :${db.connection.host}`)
+        if (!process.env.DB_URL) {
+            throw new Error("DB_URL is missing in .env");
+        }
 
+        const db = await mongoose.connect(process.env.DB_URL);
 
+        console.log(`MongoDB Connected: ${db.connection.host}`);
     } catch (error) {
-        return console.log('Db Error ', error);
-
+        console.error("MongoDB Connection Error:", error.message);
+        process.exit(1);
     }
-}
-
+};
 
 export default connectDb;

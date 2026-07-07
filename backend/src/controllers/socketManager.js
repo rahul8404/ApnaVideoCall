@@ -7,25 +7,32 @@ let timeOnline = {};
 export const connectToSocket = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: "*",
+            origin: ["https://apnavideocallfrontend-xjyp.onrender.com"],
             methods: ["GET", "POST"],
-            allowedHeaders:["*"],
-            credentials:true
+            allowedHeaders: ["*"],
+            credentials: true
         }
     });
 
     io.on("connection", (socket) => {
         console.log("SOMETHING IS CONNECTED");
-        
+
         console.log("User Connected:", socket.id);
 
         // Join Call
         socket.on("join-call", (path) => {
+
+            if (!path) {
+                return;
+            }
             if (!connections[path]) {
                 connections[path] = [];
             }
 
-            connections[path].push(socket.id);
+            if (!connections[path].includes(socket.id)) {
+                connections[path].push(socket.id);
+            }
+
             timeOnline[socket.id] = new Date();
 
             // Send old messages to newly joined user
@@ -42,17 +49,28 @@ export const connectToSocket = (server) => {
 
             // Notify others
             connections[path].forEach((id) => {
-                if (id !== socket.id) {
-                    io.to(id).emit("user-joined", socket.id);
-                }
+                io.to(id).emit(
+                    "user-joined",
+                    socket.id,
+                    connections[path]
+                );
             });
         });
 
         // WebRTC Signaling
-        socket.on("signal", (toId, signalData) => {
-            io.to(toId).emit("signal", socket.id, signalData);
-        });
 
+
+        socket.on("signal", (toId, signalData) => {
+
+            if (io.sockets.sockets.has(toId)) {
+                io.to(toId).emit(
+                    "signal",
+                    socket.id,
+                    signalData
+                );
+            }
+
+        });
         // Chat Messages
         socket.on("chat-message", (data, sender) => {
             const [matchingRoom, found] = Object.entries(connections).reduce(
@@ -98,14 +116,18 @@ export const connectToSocket = (server) => {
         socket.on("disconnect", () => {
             console.log("User Disconnected:", socket.id);
 
-            const diffTime = Math.abs(
-                new Date() - timeOnline[socket.id]
-            );
+            let diffTime = 0;
+
+
+            if (timeOnline[socket.id]) {
+                diffTime = Math.abs(
+                    new Date() - timeOnline[socket.id]
+                );
+            }
 
             console.log(
-                `User ${socket.id} stayed online for ${Math.floor(
-                    diffTime / 1000
-                )} seconds`
+                `User ${socket.id} stayed online for ${Math.floor(diffTime / 1000)
+                } seconds`
             );
 
             let key = null;
@@ -119,16 +141,18 @@ export const connectToSocket = (server) => {
 
             if (key) {
                 // Notify users
-                connections[key].forEach((id) => {
-                    io.to(id).emit("user-left", socket.id);
-                });
+                
 
-                // Remove socket
                 const index = connections[key].indexOf(socket.id);
 
                 if (index !== -1) {
                     connections[key].splice(index, 1);
                 }
+
+                connections[key].forEach((id) => {
+                    io.to(id).emit("user-left", socket.id);
+                });
+
 
                 // Delete empty room
                 if (connections[key].length === 0) {
